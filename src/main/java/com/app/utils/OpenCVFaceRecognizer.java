@@ -13,92 +13,104 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.nio.IntBuffer;
 
-import static org.bytedeco.javacpp.opencv_core.CV_32SC1;
-import static org.bytedeco.javacpp.opencv_core.CV_8UC1;
-import static org.bytedeco.javacpp.opencv_imgcodecs.imread;
-import static org.bytedeco.javacpp.opencv_imgcodecs.IMREAD_GRAYSCALE;
+import org.opencv.face.FisherFaceRecognizer;
 
-import org.bytedeco.javacpp.BytePointer;
-import org.bytedeco.javacpp.IntPointer;
-import org.bytedeco.javacpp.DoublePointer;
-import org.bytedeco.javacpp.opencv_face.FaceRecognizer;
-import org.bytedeco.javacpp.opencv_face.FisherFaceRecognizer;
-import org.bytedeco.javacpp.opencv_face.EigenFaceRecognizer;
-import org.bytedeco.javacpp.opencv_face.LBPHFaceRecognizer;
-import org.bytedeco.javacpp.opencv_core.Mat;
-import org.bytedeco.javacpp.opencv_core.MatVector;
+import static com.googlecode.javacv.cpp.opencv_core.*;
+
+import com.googlecode.javacv.cpp.opencv_contrib.FaceRecognizer;
+import com.googlecode.javacv.cpp.opencv_core;
+import com.googlecode.javacv.cpp.opencv_core.IplImage;
+
+import static com.googlecode.javacv.cpp.opencv_highgui.*;
+import static com.googlecode.javacv.cpp.opencv_core.MatVector;
+import static com.googlecode.javacv.cpp.opencv_imgproc.*;
+import static com.googlecode.javacv.cpp.opencv_contrib.*;
+
+
 
 /**
- * I couldn't find any tutorial on how to perform face recognition using OpenCV and Java,
- * so I decided to share a viable solution here. The solution is very inefficient in its
- * current form as the training model is built at each run, however it shows what's needed
- * to make it work.
+ * I couldn't find any tutorial on how to perform face recognition using OpenCV
+ * and Java, so I decided to share a viable solution here. The solution is very
+ * inefficient in its current form as the training model is built at each run,
+ * however it shows what's needed to make it work.
  *
- * The class below takes two arguments: The path to the directory containing the training
- * faces and the path to the image you want to classify. Not that all images has to be of
- * the same size and that the faces already has to be cropped out of their original images
- * (Take a look here http://fivedots.coe.psu.ac.th/~ad/jg/nui07/index.html if you haven't
- * done the face detection yet).
+ * The class below takes two arguments: The path to the directory containing the
+ * training faces and the path to the image you want to classify. Not that all
+ * images has to be of the same size and that the faces already has to be
+ * cropped out of their original images (Take a look here
+ * http://fivedots.coe.psu.ac.th/~ad/jg/nui07/index.html if you haven't done the
+ * face detection yet).
  *
- * For the simplicity of this post, the class also requires that the training images have
- * filename format: <label>-rest_of_filename.png. For example:
+ * For the simplicity of this post, the class also requires that the training
+ * images have filename format: <label>-rest_of_filename.png. For example:
  *
- * 1-jon_doe_1.png
- * 1-jon_doe_2.png
- * 2-jane_doe_1.png
- * 2-jane_doe_2.png
- * ...and so on.
+ * 1-jon_doe_1.png 1-jon_doe_2.png 2-jane_doe_1.png 2-jane_doe_2.png ...and so
+ * on.
  *
  * Source: http://pcbje.com/2012/12/doing-face-recognition-with-javacv/
  *
  * @author Petter Christian Bjelland
  */
 public class OpenCVFaceRecognizer {
-    public static void main(String[] args) {
-        String trainingDir = "./images/";
-        args[1] = "/home/shibo/Desktop/x.jpeg";
-        Mat testImage = imread(args[1], IMREAD_GRAYSCALE);
+	public static void main(String[] args) {
+		args = new String[2];
+		args[0] = ".\\\\images";
+		args[1] = "C:\\Users\\Dell\\Downloads\\images\\27072262_2207505599472489_6672660423936042843_n.jpg";
 
-        File root = new File(trainingDir);
+		IplImage testImage = cvLoadImage(args[1]);
 
-        FilenameFilter imgFilter = new FilenameFilter() {
-            public boolean accept(File dir, String name) {
-                name = name.toLowerCase();
-                return  name.endsWith(".png");
-            }
-        };
+		File root = new File(args[0] );
 
-        File[] imageFiles = root.listFiles(imgFilter);
+		FilenameFilter pngFilter = new FilenameFilter() {
+			public boolean accept(File dir, String name) {
+				return name.toLowerCase().endsWith(".png");
+			}
+		};
 
-        MatVector images = new MatVector(imageFiles.length);
+		File[] imageFiles = root.listFiles(pngFilter);
 
-        Mat labels = new Mat(imageFiles.length, 1, CV_32SC1);
-        IntBuffer labelsBuf = labels.createBuffer();
+		long n = imageFiles.length;
+		MatVector images = new MatVector(n );
 
-        int counter = 0;
+		int[] labels = new int[imageFiles.length];
 
-        for (File image : imageFiles) {
-            Mat img = imread(image.getAbsolutePath(), IMREAD_GRAYSCALE);
+		int counter = 0;
+		int label;
 
-            int label = Integer.parseInt(image.getName().split("\\-")[0]);
+		IplImage img;
+		IplImage grayImg;
 
-            images.put(counter, img);
+		for (File image : imageFiles) {
+			img = cvLoadImage(image.getAbsolutePath());
 
-            labelsBuf.put(counter, label);
+			label = Integer.parseInt(image.getName().split("\\-")[0]);
 
-            counter++;
-        }
+			grayImg = IplImage.create(img.width(), img.height(), IPL_DEPTH_8U, 1);
 
-        FaceRecognizer faceRecognizer = FisherFaceRecognizer.create();
-        // FaceRecognizer faceRecognizer = EigenFaceRecognizer.create();
-       
-        faceRecognizer.train(images, labels);
+			cvCvtColor(img, grayImg, CV_BGR2GRAY);
 
-        IntPointer label = new IntPointer(1);
-        DoublePointer confidence = new DoublePointer(1);
-        faceRecognizer.predict(testImage, label, confidence);
-        int predictedLabel = label.get(0);
+			images.put(counter, grayImg);
 
-        System.out.println("Predicted label: " + predictedLabel);
-    }
+			labels[counter] = label;
+
+			counter++;
+		}
+
+		IplImage greyTestImage = IplImage.create(testImage.width(), testImage.height(), IPL_DEPTH_8U, 1);
+
+		FisherFaceRecognizer faceRecognizer = FisherFaceRecognizer.create();
+        
+		// FaceRecognizer faceRecognizer = createEigenFaceRecognizer();
+		// FaceRecognizer faceRecognizer = createLBPHFaceRecognizer()
+
+//		faceRecognizer.train(images, labels);
+//
+//		cvCvtColor(testImage, greyTestImage, CV_BGR2GRAY);
+//
+//		int predictedLabel = faceRecognizer.predict(greyTestImage);
+//
+//		System.out.println("Predicted label: " + predictedLabel);
+	}
+
+	
 }
