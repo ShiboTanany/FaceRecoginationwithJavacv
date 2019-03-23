@@ -183,9 +183,9 @@ public class SignupGUI extends javax.swing.JFrame {
 
         try {
             new File("./images/").mkdir();
-            File outputfile = new File("./images/" + name + new Date().toString().trim());
+            File outputfile = new File(".\\images\\" + name+".png");
 
-            ImageIO.write(image, "jpg", outputfile);
+            ImageIO.write(image, "png", outputfile);
         } catch (IOException e) {
             System.out.println("Exception occured :" + e.getMessage());
         }
